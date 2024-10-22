@@ -37,3 +37,5 @@ export NS_PER_ENV="true"
 ##  Prefixes release namespace. K8S_NAMESPACE variable is used for namespace for release
 ##  If used, include trailing slash. (e.g. NS_PREFIX='myenv-')
 export NS_PREFIX=""
+## END OF AUTOMATED VARS ##
+
