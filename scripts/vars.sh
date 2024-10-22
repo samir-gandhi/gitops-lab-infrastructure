@@ -27,3 +27,8 @@ export KUSTOMIZE_FILE="${KUSTOMIZE_DIR}/kustomize"
 ##  Prefixes ENV variable. ENV variable is used for helm release name.
 ##  If used, include trailing slash. (e.g. ENV_PREFIX="myenv-")
 export ENV_PREFIX=""
+
+export NS_PER_ENV="true"
+##  Prefixes release namespace. K8S_NAMESPACE variable is used for namespace for release
+##  If used, include trailing slash. (e.g. NS_PREFIX='myenv-')
+export NS_PREFIX=""
