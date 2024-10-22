@@ -104,7 +104,7 @@ pingdataconsole:
     PDC_PROFILE_SHA: "${PINGDATACONSOLE_SHA}"
 
 pingauthorize:
-  enabled: true
+  enabled: false
   envs:
     SERVER_PROFILE_PATH: profiles/pingauthorize
     PAZ_PROFILE_SHA: "${PINGAUTHORIZE_SHA}"

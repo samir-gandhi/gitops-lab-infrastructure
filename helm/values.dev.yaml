@@ -28,6 +28,6 @@ pingdataconsole:
     SERVER_PROFILE_BRANCH: "${SERVER_PROFILE_BRANCH}"
 
 pingauthorize:
-  enabled: true
+  enabled: false
   envs:
     SERVER_PROFILE_BRANCH: "${SERVER_PROFILE_BRANCH}"
