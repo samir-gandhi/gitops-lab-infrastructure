@@ -35,6 +35,7 @@ while ! test -z ${1} ; do
 done
 
 # Source global functions and variables
+set -x
 . "${CWD}/vars.sh"
 . "${CWD}/functions.sh"
 getLocalSecrets
