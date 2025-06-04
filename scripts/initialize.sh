@@ -64,7 +64,7 @@ apiVersion: v1
 kind: ServiceAccount
 metadata:
   name: ping-devops-admin
-  namespace: ${_k8sNamespace}
+  namespace: "${_k8sNamespace}"
 ---
 apiVersion: v1
 items:
@@ -95,13 +95,13 @@ roleRef:
 subjects:
 - kind: ServiceAccount
   name: ping-devops-admin
-  namespace: ${_k8sNamespace}
+  namespace: "${_k8sNamespace}"
 EOF
 else
   echo "Using one namespace for all environments.."
   read -p "Which Kubernetes namespace to use? (Enter for ${_currentNamespace})"
   _k8sNamespace="${REPLY:-${_currentNamespace}}"
-  echo "Using Namespace: ${_k8sNamespace}"
+  echo "Using Namespace: \"${_k8sNamespace}\""
   echo "export K8S_NAMESPACE=${_k8sNamespace}" >> "${CWD}/vars.sh"
   echo "Generating Kubeconfig: ${_k8sNamespace}.."
 
@@ -110,7 +110,7 @@ apiVersion: v1
 kind: ServiceAccount
 metadata:
   name: ping-devops-admin
-  namespace: ${_k8sNamespace}
+  namespace: "${_k8sNamespace}"
 ---
 apiVersion: v1
 items:
@@ -118,7 +118,7 @@ items:
   kind: Role
   metadata:
     name: namespace-admin
-    namespace: ${_k8sNamespace}
+    namespace: "${_k8sNamespace}"
   rules:
   - apiGroups:
     - '*'
@@ -146,8 +146,7 @@ EOF
 
 fi
 
-USER_TOKEN_NAME=$(kubectl -n ${_k8sNamespace} get serviceaccount ping-devops-admin -o=jsonpath='{.secrets[0].name}')
-USER_TOKEN_VALUE=$(kubectl -n ${_k8sNamespace} get secret/${USER_TOKEN_NAME} -o=go-template='{{.data.token}}' | base64 --decode)
+USER_TOKEN_VALUE=$(kubectl -n "${_k8sNamespace}" create token ping-devops-admin)
 CURRENT_CONTEXT=$(kubectl config current-context)
 CURRENT_CLUSTER=$(kubectl config view --raw -o=go-template='{{range .contexts}}{{if eq .name "'''${CURRENT_CONTEXT}'''"}}{{ index .context "cluster" }}{{end}}{{end}}')
 CLUSTER_CA=$(kubectl config view --raw -o=go-template='{{range .clusters}}{{if eq .name "'''${CURRENT_CLUSTER}'''"}}"{{with index .cluster "certificate-authority-data" }}{{.}}{{end}}"{{ end }}{{ end }}')
@@ -162,7 +161,7 @@ contexts:
   context:
     cluster: ${CURRENT_CONTEXT}
     user: ping-devops-admin
-    namespace: ${_k8sNamespace}
+    namespace: "${_k8sNamespace}"
 clusters:
 - name: ${CURRENT_CONTEXT}
   cluster:
@@ -171,7 +170,7 @@ clusters:
 users:
 - name: ping-devops-admin
   user:
-    token: ${USER_TOKEN_VALUE}
+    token: "${USER_TOKEN_VALUE}"
 EOF
 
 ## create KUBECONFIG_YAML secret
