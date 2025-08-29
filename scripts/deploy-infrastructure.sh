@@ -92,7 +92,8 @@ if test "$_branch" = "prod" || test  "$_branch" = qa ; then
 fi
 export TF_VAR_k8s_helm_deployment_name="${_branch}"
 export TF_VAR_pingone_environment_name="${_branch}"
-export TFDIR="01-infrastructure"
+# Default Terraform directory to the renamed folder; allow override via env
+export TFDIR="${TFDIR:-infrastructure}"
 
 ## S3 state bucket variables
 ## local aws default profile will be used
