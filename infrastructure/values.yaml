@@ -1,6 +1,7 @@
 global:
   envs:
     PING_IDENTITY_ACCEPT_EULA: "YES"
+    SERVER_PROFILE_URL: https://github.com/samir-gandhi/gitops-lab-infrastructure.git
   
   ingress:
     enabled: true
@@ -19,7 +20,6 @@ global:
 pingfederate-admin:
   enabled: true
   envs:
-    SERVER_PROFILE_URL: https://github.com/samir-gandhi/gitops-lab-platform.git
     SERVER_PROFILE_PATH: server-profiles/pingfederate
   container:
     # resources:
@@ -50,7 +50,6 @@ pingfederate-admin:
 pingfederate-engine:
   enabled: true
   envs:
-    SERVER_PROFILE_URL: https://github.com/samir-gandhi/gitops-lab-platform.git
     SERVER_PROFILE_PATH: server-profiles/pingfederate
   container:
     replicaCount: 1
@@ -69,7 +68,6 @@ pingfederate-engine:
 pingdirectory:
   enabled: true
   envs:
-    SERVER_PROFILE_URL: https://github.com/samir-gandhi/gitops-lab-platform.git
     SERVER_PROFILE_PATH: server-profiles/pingdirectory
 
   persistentvolume:
@@ -82,5 +80,4 @@ pingdirectory:
 pingdataconsole:
   enabled: true
   envs:
-    SERVER_PROFILE_URL: https://github.com/samir-gandhi/gitops-lab-platform.git
     SERVER_PROFILE_PATH: server-profiles/pingdirectory
