@@ -151,3 +151,4 @@ jobs:
           echo "{\"branch\":\"${_branch}\", \"infraStatus\":\"ready\", \"epoch\":$EPOCH_TIME}" > infra_status.json
           aws s3 cp infra_status.json "s3://${_aws_bucket}/branch_infra_status/${_branch}/infra_status.json"
         fi
+        
