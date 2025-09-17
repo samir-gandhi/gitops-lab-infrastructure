@@ -1,0 +1,93 @@
+name: Infra Drift Detection
+
+on:
+  schedule:
+    - cron: '0 2 * * *'  # Daily at 02:00 UTC
+  workflow_dispatch: {}
+
+jobs:
+  validate:
+    name: validate
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      TERRAFORM_ENV_BASE64: ${{ secrets.TERRAFORM_ENV_BASE64 }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - uses: hashicorp/setup-terraform@v3
+      - name: Terraform Validate
+        run: |-
+          echo $TERRAFORM_ENV_BASE64 | base64 -d > tfvars
+          source tfvars
+          _tfdir=infrastructure
+          _branch=$(echo "${GITHUB_REF}" | sed -e "s#refs/heads/##g")
+          export TF_VAR_k8s_helm_deployment_name="${_branch}"
+          export TF_VAR_pingone_environment_name=${_branch}
+          case $_branch in
+            prod)
+              _stateKey="${TF_VAR_tf_state_key_prefix_infrastructure}/prod/terraform.tfstate" ;;
+            qa)
+              _stateKey="${TF_VAR_tf_state_key_prefix_infrastructure}/qa/terraform.tfstate" ;;
+            *)
+              _stateKey="${TF_VAR_tf_state_key_prefix_infrastructure}/dev/${_branch}/terraform.tfstate" ;;
+          esac
+          terraform -chdir=${_tfdir} init \
+            -backend-config="bucket=$TF_VAR_tf_state_bucket" \
+            -backend-config="region=$TF_VAR_tf_state_region" \
+            -backend-config="key=${_stateKey}"
+          echo "***Running terraform validate***"
+          terraform -chdir=${_tfdir} validate
+
+  drift_check:
+    name: drift-check
+    needs: [validate]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      TERRAFORM_ENV_BASE64: ${{ secrets.TERRAFORM_ENV_BASE64 }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - uses: hashicorp/setup-terraform@v3
+      - name: Terraform Drift Plan
+        id: plan
+        run: |-
+          set -e
+          echo $TERRAFORM_ENV_BASE64 | base64 -d > tfvars
+          source tfvars
+          _tfdir=infrastructure
+          _branch=$(echo "${GITHUB_REF}" | sed -e "s#refs/heads/##g")
+          export TF_VAR_k8s_helm_deployment_name="${_branch}"
+          export TF_VAR_pingone_environment_name=${_branch}
+          case $_branch in
+            prod)
+              _stateKey="${TF_VAR_tf_state_key_prefix_infrastructure}/prod/terraform.tfstate" ;;
+            qa)
+              _stateKey="${TF_VAR_tf_state_key_prefix_infrastructure}/qa/terraform.tfstate" ;;
+            *)
+              _stateKey="${TF_VAR_tf_state_key_prefix_infrastructure}/dev/${_branch}/terraform.tfstate" ;;
+          esac
+          terraform -chdir=${_tfdir} init \
+            -backend-config="bucket=$TF_VAR_tf_state_bucket" \
+            -backend-config="region=$TF_VAR_tf_state_region" \
+            -backend-config="key=${_stateKey}"
+          echo "***Running terraform plan (drift detection)***"
+          set +e
+          terraform -chdir=${_tfdir} plan -detailed-exitcode -no-color > plan.out 2>&1
+          PLAN_EXIT=$?
+          set -e
+          cat plan.out
+          if [ $PLAN_EXIT -eq 0 ]; then
+            echo "drift=false" >> $GITHUB_OUTPUT
+            echo "No drift detected"
+          elif [ $PLAN_EXIT -eq 2 ]; then
+            echo "drift=true" >> $GITHUB_OUTPUT
+            echo "Drift detected"
+            exit 1
+          else
+            echo "Terraform plan error (exit $PLAN_EXIT)" >&2
+            exit $PLAN_EXIT
+          fi
+
+      # Placeholder for future notification step
