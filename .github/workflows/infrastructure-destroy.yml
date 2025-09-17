@@ -1,0 +1,127 @@
+name: Infra Destroy
+
+on:
+  delete:
+    branches-ignore:
+      - 'qa'
+      - 'prod'
+  workflow_dispatch:
+    inputs:
+      branch:
+        description: "Branch name to destroy (for manual run; leave blank when triggered by delete event)"
+        required: false
+
+jobs:
+  destroy:
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event_name == 'delete' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      TERRAFORM_ENV_BASE64: ${{ secrets.TERRAFORM_ENV_BASE64 }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Determine branch
+        id: branch
+        run: |
+          # For delete event, github.event.ref holds the short branch name
+          if [ "${GITHUB_EVENT_NAME}" = "delete" ]; then
+            BRANCH_NAME="${{ github.event.ref }}"
+          else
+            # workflow_dispatch path; user can provide an explicit branch name
+            if [ -n "${{ github.event.inputs.branch }}" ]; then
+              BRANCH_NAME="${{ github.event.inputs.branch }}"
+            else
+              BRANCH_NAME="$(echo "${GITHUB_REF}" | sed -e 's#refs/heads/##')"
+            fi
+          fi
+          echo "branch=${BRANCH_NAME}" >> $GITHUB_OUTPUT
+          echo "Branch resolved: ${BRANCH_NAME}"
+
+      - name: Guard protected branches
+        run: |
+          case "${{ steps.branch.outputs.branch }}" in
+            prod|qa|main|master)
+              echo "Refusing to auto-destroy protected branch ${{ steps.branch.outputs.branch }}" >&2
+              exit 1
+              ;;
+          esac
+
+      - name: Configure AWS Credentials
+        run: |
+          echo $TERRAFORM_ENV_BASE64 | base64 -d > tfvars
+          source tfvars
+          aws configure set aws_access_key_id ${AWS_ACCESS_KEY_ID}
+          aws configure set aws_secret_access_key ${AWS_SECRET_ACCESS_KEY}
+          aws configure set region ${AWS_REGION}
+
+      - name: Mark infra status in-progress
+        run: |
+          echo $TERRAFORM_ENV_BASE64 | base64 -d > tfvars
+          source tfvars
+          BRANCH_NAME='${{ steps.branch.outputs.branch }}'
+          EPOCH_TIME=$(date +%s)
+          _aws_bucket="${TF_VAR_tf_state_bucket}"
+          echo "{""branch"":""${BRANCH_NAME}"", ""infraStatus"":""destroy-in-progress"", ""epoch"":${EPOCH_TIME}}" > infra_status.json
+          aws s3 cp infra_status.json "s3://${_aws_bucket}/branch_infra_status/${BRANCH_NAME}/infra_status.json"
+
+      - uses: hashicorp/setup-terraform@v3
+
+      - name: Prepare kubeconfig (needed for providers)
+        run: |
+          mkdir -p ${HOME}/.kube
+          echo "${{ secrets.KUBECONFIG_YAML }}" | base64 --decode > ${HOME}/.kube/config
+          kubectl version --client
+
+      - name: Terraform Destroy
+        id: destroy
+        run: |
+          set -e
+          echo $TERRAFORM_ENV_BASE64 | base64 -d > tfvars
+          source tfvars
+          _tfdir="infrastructure"
+          _branch='${{ steps.branch.outputs.branch }}'
+          export TF_VAR_k8s_helm_deployment_name="${_branch}"
+          export TF_VAR_pingone_environment_name="${_branch}"
+
+          case $_branch in
+            prod)
+              echo "Refusing destroy of prod" >&2; exit 1;;
+            qa)
+              echo "Refusing destroy of qa" >&2; exit 1;;
+            *)
+              _stateKey="${TF_VAR_tf_state_key_prefix_infrastructure}/dev/${_branch}/terraform.tfstate";;
+          esac
+
+          terraform -chdir=${_tfdir} init \
+            -backend-config="bucket=$TF_VAR_tf_state_bucket" \
+            -backend-config="region=$TF_VAR_tf_state_region" \
+            -backend-config="key=${_stateKey}"
+
+          echo "***Running terraform destroy***"
+          terraform -chdir=${_tfdir} destroy -auto-approve
+
+      - name: Update infra status (destroyed)
+        if: success()
+        run: |
+          echo $TERRAFORM_ENV_BASE64 | base64 -d > tfvars
+          source tfvars
+          BRANCH_NAME='${{ steps.branch.outputs.branch }}'
+          EPOCH_TIME=$(date +%s)
+          _aws_bucket="${TF_VAR_tf_state_bucket}"
+          echo "{""branch"":""${BRANCH_NAME}"", ""infraStatus"":""destroyed"", ""epoch"":${EPOCH_TIME}}" > infra_status.json
+          aws s3 cp infra_status.json "s3://${_aws_bucket}/branch_infra_status/${BRANCH_NAME}/infra_status.json"
+
+      - name: Update infra status (failed)
+        if: ${{ failure() }}
+        run: |
+          echo $TERRAFORM_ENV_BASE64 | base64 -d > tfvars
+          source tfvars
+          BRANCH_NAME='${{ steps.branch.outputs.branch }}'
+          EPOCH_TIME=$(date +%s)
+          _aws_bucket="${TF_VAR_tf_state_bucket}"
+          echo "{""branch"":""${BRANCH_NAME}"", ""infraStatus"":""destroy-failed"", ""epoch"":${EPOCH_TIME}}" > infra_status.json
+          aws s3 cp infra_status.json "s3://${_aws_bucket}/branch_infra_status/${BRANCH_NAME}/infra_status.json"
