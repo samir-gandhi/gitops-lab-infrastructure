@@ -26,7 +26,7 @@ trivy:
 	@command -v trivy >/dev/null 2>&1 || { echo >&2 "'trivy' is required but not installed. Aborting."; exit 1; }
 	@TF_VAR_pingone_environment_name=$(shell git rev-parse --abbrev-ref HEAD) trivy config ./
 
-infracheck: fmt-check tflint validate trivy
+devcheck: fmt-check tflint validate trivy kubeconfig
 	@echo "==> Infrastructure validation complete"
 
 deploy:
@@ -38,4 +38,8 @@ clean:
 	@rm -rf $(INFRA_DIR)/.terraform
 	@rm -f $(INFRA_DIR)/terraform.tfstate*
 
-.PHONY: fmt fmt-check tflint validate trivy infracheck deploy clean
+kubeconfig:
+	@echo "==> Setting up kubeconfig..."
+	@./scripts/kubeconfig.sh
+
+.PHONY: fmt fmt-check tflint validate trivy devcheck deploy clean kubeconfig
