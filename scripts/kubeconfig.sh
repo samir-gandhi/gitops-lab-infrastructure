@@ -2,7 +2,8 @@
 
 # Strict mode: abort on error and undefined vars
 set -eu
-
+# TODO: fix hard code
+kubens ping-devops-samirgandhi
 # Get the directory where the script is located
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 
