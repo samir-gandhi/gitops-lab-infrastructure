@@ -34,7 +34,7 @@ jobs:
       TERRAFORM_ENV_BASE64: ${{ secrets.TERRAFORM_ENV_BASE64 }}
     steps:
     - uses: actions/checkout@v4
-    - uses: terraform-linters/setup-tflint@v4
+    - uses: terraform-linters/setup-tflint@v6
       name: Setup TFLint
       with:
         tflint_version: latest
